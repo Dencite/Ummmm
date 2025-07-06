@@ -1,41 +1,68 @@
+```python
+import os
+
 import requests
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, jsonify, request
 
-app = Flask(__name__)
-CORS(app)
+app = Flask('name')
 
-API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6ImU1ZjZlMDBlLTVkYTktNGE1OS05ODEwLWRhYzAzYjk0MWUxZSIsImlhdCI6MTc1MTgxNDcxOCwic3ViIjoiZGV2ZWxvcGVyLzQ3MTBkOGUwLTY0ZjYtYzA2Ny0xZTI4LTQwOGU1OTA5YzQ0YiIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIyMTYuMjQuNTcuMSJdLCJ0eXBlIjoiY2xpZW50In1dfQ.pXegtyYpt5Qo3TKr88v_kY75BXRQ94ScZVchL7wpNHPvC21e1sNaNN5A8-0D-10LMbKRwtw6PvXGagEmjqtobg"
-HEADERS = {"Authorization": f"Bearer {API_TOKEN}"}
+API_TOKEN = os.environ.get("CR_API_TOKEN")   # Set this in Render Dashboard
 
-@app.route("/get_deck", methods=["GET"])
+HEADERS = {
+    "Authorization": f"Bearer {API_TOKEN}"
+}
+
+
+@app.route("/get-deck", methods=["POST"])
 def get_deck():
-    medal_count = request.args.get("medals", type=int)
-    if not medal_count:
-        return jsonify({"error": "Invalid medals value"}), 400
+    try:
+        print('running')
+        data = request.get_json()
+        medals = int(data.get('medals'))
+        print(medals)
 
-    res = requests.get("https://api.clashroyale.com/v1/rankings/global/pathOfLegend", headers=HEADERS)
-    if res.status_code != 200:
-        return jsonify({"error": "Failed to fetch leaderboard"}), 500
+        # Step 1: Get leaderboard players
+        limit = 300
+        CR_API_BASE_URL = "https://api.clashroyale.com/v1"
+        leaderboard_url = f"{CR_API_BASE_URL}/locations/global/pathoflegend/players?limit={limit}"
+        res = requests.get(leaderboard_url, headers=HEADERS, timeout=10)
 
-    leaderboard = res.json().get("items", [])
-    for player in leaderboard:
-        try:
-            trophies = player["pathOfLegendStatistics"]["seasonResult"]["trophies"]
-            if trophies == medal_count:
+        if res.status_code != 200:
+            return jsonify({"error": f"Leaderboard fetch failed: {res.status_code} (reason: {res.reason})"}), 500
+
+        players = res.json().get("items", [])
+        print('first player:')
+        print(players[0] if players else "No players found")
+
+        # Step 2: Match exact medals and fetch deck
+        for player in players:
+            if player.get("eloRating") == medals:
+                print('found player with exact medals')
                 tag = player["tag"].replace("#", "%23")
-                log = requests.get(f"https://api.clashroyale.com/v1/players/{tag}/battlelog", headers=HEADERS)
-                if log.status_code == 200:
-                    battles = log.json()
-                    for b in battles:
-                        if b["type"] == "pathOfLegend":
-                            deck = [c["name"] for c in b["team"][0]["cards"]]
-                            return jsonify({"name": player["name"], "tag": player["tag"], "deck": deck})
-        except:
-            continue
+                battle_url = f"https://api.clashroyale.com/v1/players/{tag}/battlelog"
+                battle_res = requests.get(battle_url, headers=HEADERS, timeout=10)
 
-    return jsonify({"error": "No player found with this exact medal count"}), 404
+                if battle_res.status_code != 200:
+                    return jsonify({"error": "Battle log fetch failed"}), 500
+
+                battles = battle_res.json()
+                for battle in battles:
+                    if battle["gameMode"]['name'] == "Ranked1v1_NewArena2":
+                        print('battle has good type')
+                        deck = [{"name": c["name"], "level": c["level"]} for c in battle["team"][0]["cards"]]
+                        return jsonify({"deck": deck})
+
+        return jsonify({"error": "Player not found with exact medals"}), 404
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/")
 def home():
-    return "Clash Royale UC Deck Finder is live!"
+    return "Backend is Running"
+
+
+if __name__ == "__main__":
+    app.run()
+```
