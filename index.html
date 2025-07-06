@@ -1,19 +1,28 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>UC Deck Finder</title></head>
+<head><title>UC Deck Finder</title></head>
 <body>
-  <h2>Ultimate Champion Deck Finder</h2>
-  <input type="number" id="medals" placeholder="Enter medals"/><button onclick="getDeck()">Find Deck</button>
+  <h2>Find Deck by Ultimate Champion Medals</h2>
+  <input id="medals" type="number" placeholder="Enter medals" />
+  <button onclick="fetchDeck()">Fetch Deck</button>
   <pre id="output"></pre>
 
   <script>
-    async function getDeck() {
-      const m = document.getElementById("medals").value;
-      const r = await fetch(`https://<pop-tuoh>.onrender.com/get_deck?medals=${m}`);
-      const j = await r.json();
-      if (j.deck) document.getElementById("output").textContent = 
-        \`Player: \${j.name} (\${j.tag})\nDeck: \${j.deck.join(", ")}\`;
-      else document.getElementById("output").textContent = 'Error: ' + (j.error || r.status);
+    async function fetchDeck() {
+      const medals = parseInt(document.getElementById("medals").value);
+      const response = await fetch("https://pop-tuoh.onrender.com/get-deck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ medals: medals })
+      });
+
+      const result = await response.json();
+      if (result.deck) {
+        document.getElementById("output").textContent =
+          "Deck:\n" + result.deck.map(c => `${c.name} (Level ${c.level})`).join("\n");
+      } else {
+        document.getElementById("output").textContent = "Error: " + result.error;
+      }
     }
   </script>
 </body>
