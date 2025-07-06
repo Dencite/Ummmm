@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>UC Deck Finder</title></head>
+<body>
+  <h2>Ultimate Champion Deck Finder</h2>
+  <input type="number" id="medals" placeholder="Enter medals"/><button onclick="getDeck()">Find Deck</button>
+  <pre id="output"></pre>
+
+  <script>
+    async function getDeck() {
+      const m = document.getElementById("medals").value;
+      const r = await fetch(`https://<Ummmm>.onrender.com/get_deck?medals=${m}`);
+      const j = await r.json();
+      if (j.deck) document.getElementById("output").textContent = 
+        \`Player: \${j.name} (\${j.tag})\nDeck: \${j.deck.join(", ")}\`;
+      else document.getElementById("output").textContent = 'Error: ' + (j.error || r.status);
+    }
+  </script>
+</body>
+</html>
