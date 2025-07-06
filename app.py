@@ -5,7 +5,6 @@ import requests
 from flask import Flask, jsonify, request
 
 app = Flask('name')
-
 API_TOKEN = os.environ.get("CR_API_TOKEN")   # Set this in Render Dashboard
 
 HEADERS = {
